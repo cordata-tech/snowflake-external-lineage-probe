@@ -13,7 +13,13 @@ Notes taken while running, not reconstructed afterwards. For blog post #39.
 | Edition | Enterprise |
 | Version | `10.31.103` |
 | Type | **30-day free trial**, no payment method attached |
+| Identifiers | placeholders throughout — see the note below |
 | Date | 2026-09-06 |
+
+**Account identifiers in this file and in the payloads are placeholders.**
+`AB12345`, `myorg`, `myacct` stand in for the real locator, organisation and
+account. The *forms* are preserved exactly, because the difference between
+them is itself a finding — see *A 200 does not mean stored*.
 
 ## P0 — is external lineage reachable on a free trial at all?
 
@@ -27,7 +33,7 @@ list, and nothing about the trial blocked it.
 
 ```sql
 CREATE ROLE IF NOT EXISTS lineage_probe;
-GRANT ROLE lineage_probe TO USER PROBE_USER;
+GRANT ROLE lineage_probe TO USER <your_user>;
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE lineage_probe;
 GRANT INGEST LINEAGE ON ACCOUNT TO ROLE lineage_probe;   -- succeeded
 GRANT DELETE LINEAGE ON ACCOUNT TO ROLE lineage_probe;   -- succeeded
@@ -212,10 +218,20 @@ back, from SQL or from the console.
 
 ### A 200 does not mean stored
 
-The Run ID on the surviving edge is the **fourth** namespace variant,
-`snowflake://myorg-myacct.snowflakecomputing.com`. The fifth variant —
-`MYORG-MYACCT`, no scheme, not a valid OpenLineage namespace by any reading
-— also returned **HTTP 200 with an empty body**, and is not the edge shown.
+The same event was sent five times with five spellings of the Snowflake
+namespace, to find which form the endpoint wanted:
+
+| # | namespace sent | HTTP |
+|---|---|---|
+| 1 | `snowflake://MYORG-MYACCT` | 200 |
+| 2 | `snowflake://myorg-myacct` | 200 |
+| 3 | `snowflake://AB12345` (account locator) | 200 |
+| 4 | `snowflake://myorg-myacct.snowflakecomputing.com` | 200 |
+| 5 | `MYORG-MYACCT` — no scheme at all | 200 |
+
+All five accepted, all with an empty body. The Run ID on the surviving edge
+is the **fourth**. The fifth is not a valid OpenLineage namespace by any
+reading, and it was accepted just as cheerfully as the rest.
 
 So the endpoint returns success for events it does not resolve, and the
 producer has no way to tell the difference. There is no ack, no id, no count,
