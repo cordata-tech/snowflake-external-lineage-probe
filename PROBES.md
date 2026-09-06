@@ -156,13 +156,44 @@ The published docs describe a `namespace =>` named argument and an
 in the deployed function.** `SHOW FUNCTIONS` was the reliable source and the
 documentation was not.
 
-### Still open on P1
+### P1 answered from the UI: some facets survive, the governance ones do not
 
-Whether the custom `job.facets.processing` fields (`purpose`, `legal_basis`)
-survived is **still unanswered**, and now for a different reason: there is no
-SQL path to the external edge, so there is nowhere to read facets from. Next
-step is to check whether the Snowsight UI surfaces any facet detail when the
-external node or the edge is selected.
+Selecting the edge in Snowsight gives an **Edge details** panel:
+
+| field | value |
+|---|---|
+| Type | **OpenLineage** |
+| Run on | Sep 6, 2026, 8:21:42 AM |
+| Run ID | `44444444-4444-4444-8444-444444444444` |
+| From | Amazon S3 · `fraud_raw/transactions` · `s3://cordata-lake` |
+| To | TABLE · `TRANSACTIONS_SCORED` · `LINEAGE_TEST.PUBLIC` |
+
+**`columnLineage` survived.** The external S3 node renders columns `tx_id` and
+`amount`, which appeared in no other part of the payload, and `TX_ID` is
+highlighted as linked. The deliberately mismatched mapping — `amount` to
+`FRAUD_SCORE`, differently named on each side — came back correctly, so this
+is stored assertion rather than name matching.
+
+**The governance facets did not.** Nothing in the panel carries `purpose`,
+`legal_basis` or `sourceCodeLocation`, and the job's own name,
+`transactions-scored-daily`, is absent too. What is kept is addressing —
+where from, where to, which columns, which run, when.
+
+That is a coherent design for a lineage viewer and useless as an Art. 30
+input. Part 2 § 1 puts `purpose` and `legal_basis` on every event precisely so
+the RoPA can be projected from them; those fields go in and cannot be got
+back, from SQL or from the console.
+
+### A 200 does not mean stored
+
+The Run ID on the surviving edge is the **fourth** namespace variant,
+`snowflake://myorg-myacct.snowflakecomputing.com`. The fifth variant —
+`MYORG-MYACCT`, no scheme, not a valid OpenLineage namespace by any reading
+— also returned **HTTP 200 with an empty body**, and is not the edge shown.
+
+So the endpoint returns success for events it does not resolve, and the
+producer has no way to tell the difference. There is no ack, no id, no count,
+no error, and no SQL surface to check against afterwards.
 
 ## Still to run
 - **P3** — is an unmodified `cordata-tech/pipeline-runtime` event accepted?
