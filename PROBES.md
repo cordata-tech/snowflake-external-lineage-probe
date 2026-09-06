@@ -221,6 +221,77 @@ So the endpoint returns success for events it does not resolve, and the
 producer has no way to tell the difference. There is no ack, no id, no count,
 no error, and no SQL surface to check against afterwards.
 
+## P5 — could dbt or Airflow get more back? **No.**
+
+Raised as a review question: the documentation says dbt and Airflow send
+lineage to this endpoint, so perhaps their integrations carry data a manual
+client cannot. Two answers.
+
+**The documentation says they cannot.** On configuring dbt: *"Configuring dbt
+to emit OpenLineage events isn't unique to Snowflake; the only thing specific
+to Snowflake is the endpoint and base URL of external lineage."* Same wording
+for Airflow. There is no privileged channel — it is JSON over REST either way.
+
+**Tested rather than argued.** Sent one `COMPLETE` event carrying eleven
+standard OpenLineage facets, with `producer` set to the dbt integration's own
+URL and `User-Agent: OpenLineage-dbt/1.20.0`, so Snowflake had every signal it
+would need to treat it as a dbt event.
+
+**One correction to earlier findings: `datasetType` IS retained.** The node
+now reports `Type: FILE` where the previous probe's node said
+`Type: External Node`. Both facets the documentation names — `columnLineage`
+and `datasetType` — work exactly as described. I had not tested the second
+one, and the earlier "what is kept" list was incomplete.
+
+The `subType` of `PARQUET` did not surface; only the top-level type.
+
+Everything else was ignored, and the edge panel is identical to the previous
+probe's:
+
+| standard facet sent | kept |
+|---|---|
+| `datasetType` | **yes** |
+| `columnLineage` | **yes** |
+| `sql` | no |
+| `sourceCode`, `sourceCodeLocation` | no |
+| `documentation` (job and dataset) | no |
+| `ownership` (job and dataset) | no |
+| `jobType` (`BATCH` / `DBT` / `MODEL`) | no |
+| `parent` (the Airflow DAG and task) | no |
+| `processing_engine`, `nominalTime` | no |
+| `dataSource`, `storage` | no |
+| `dataQualityMetrics`, `outputStatistics` | no |
+
+### The rule, stated exactly
+
+Snowflake keeps **addressing** — namespaces, names, columns, run id, event
+time — plus **the two facets it documents**. Everything else in the spec is
+discarded, whoever sent it.
+
+### The finding this produced that is better than the original
+
+`parent` is how Airflow's OpenLineage integration says **which DAG and which
+task** produced a run. It is dropped. So an Airflow user looking at an edge in
+Snowsight cannot tell which pipeline wrote it — the graph knows a run
+happened, and not what ran.
+
+That is stronger than our own `processing` facet being ignored. A custom facet
+being dropped is unremarkable; the flagship integration's own parentage being
+dropped is a statement about what this store is for.
+
+### Grading the claim honestly
+
+The post should not present these as one undifferentiated list:
+
+1. **Our custom `processing` facet** (`purpose`, `legal_basis`) — dropped, and
+   Snowflake never promised otherwise. Weakest form of the claim.
+2. **Standard OpenLineage facets** — `sql`, `parent`, `ownership`,
+   `sourceCodeLocation` and the rest. Dropped. Notable, because these are the
+   spec, not our invention.
+3. **Core spec fields** — `job.name`, `job.namespace`, `producer`. Dropped.
+   These are required properties of a RunEvent, not "additional properties",
+   so the documentation's *"Snowflake ignores them"* does not cover them.
+
 ## Still to run
 - **P3** — is an unmodified `cordata-tech/pipeline-runtime` event accepted?
 - **P4** — can the original OpenLineage JSON be read back anywhere?

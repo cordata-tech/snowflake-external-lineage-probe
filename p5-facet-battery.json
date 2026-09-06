@@ -1,0 +1,56 @@
+{
+  "eventType": "COMPLETE",
+  "eventTime": "2026-09-06T11:00:00.000Z",
+  "producer": "https://github.com/OpenLineage/OpenLineage/tree/1.20.0/integration/dbt",
+  "schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent",
+  "run": {
+    "runId": "55555555-5555-4555-8555-555555555555",
+    "facets": {
+      "nominalTime": {"_producer":"p","_schemaURL":"s","nominalStartTime":"2026-09-06T11:00:00Z"},
+      "processing_engine": {"_producer":"p","_schemaURL":"s","name":"dbt","version":"1.9.2"},
+      "parent": {"_producer":"p","_schemaURL":"s",
+                 "job":{"namespace":"airflow","name":"fraud_dag.score_task"},
+                 "run":{"runId":"99999999-9999-4999-8999-999999999999"}}
+    }
+  },
+  "job": {
+    "namespace": "cordata.fraud",
+    "name": "battery-probe-job",
+    "facets": {
+      "jobType": {"_producer":"p","_schemaURL":"s","processingType":"BATCH","integration":"DBT","jobType":"MODEL"},
+      "sql": {"_producer":"p","_schemaURL":"s","query":"select tx_id, score(amount) as fraud_score from raw"},
+      "documentation": {"_producer":"p","_schemaURL":"s","description":"Scores transactions for fraud."},
+      "sourceCode": {"_producer":"p","_schemaURL":"s","language":"sql","sourceCode":"select 1"},
+      "ownership": {"_producer":"p","_schemaURL":"s","owners":[{"name":"team:fraud","type":"TEAM"}]}
+    }
+  },
+  "inputs": [
+    {
+      "namespace": "s3://cordata-lake",
+      "name": "fraud_raw/battery",
+      "facets": {
+        "datasetType": {"_producer":"p","_schemaURL":"s","datasetType":"FILE","subType":"PARQUET"},
+        "dataSource": {"_producer":"p","_schemaURL":"s","name":"cordata-lake","uri":"s3://cordata-lake"},
+        "documentation": {"_producer":"p","_schemaURL":"s","description":"Raw transaction drops."},
+        "ownership": {"_producer":"p","_schemaURL":"s","owners":[{"name":"team:ingest","type":"TEAM"}]},
+        "storage": {"_producer":"p","_schemaURL":"s","storageLayer":"s3","fileFormat":"parquet"}
+      },
+      "inputFacets": {
+        "dataQualityMetrics": {"_producer":"p","_schemaURL":"s","rowCount":12345,"bytes":98765}
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "namespace": "snowflake://MYORG-MYACCT",
+      "name": "LINEAGE_TEST.PUBLIC.FACET_BATTERY",
+      "facets": {
+        "columnLineage": {"_producer":"p","_schemaURL":"s","fields":{
+          "TX_ID":{"inputFields":[{"namespace":"s3://cordata-lake","name":"fraud_raw/battery","field":"tx_id"}]}}}
+      },
+      "outputFacets": {
+        "outputStatistics": {"_producer":"p","_schemaURL":"s","rowCount":12345,"size":98765}
+      }
+    }
+  ]
+}
