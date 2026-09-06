@@ -179,6 +179,32 @@ is stored assertion rather than name matching.
 `transactions-scored-daily`, is absent too. What is kept is addressing —
 where from, where to, which columns, which run, when.
 
+Confirmed exhaustively afterwards: the edge panel ends at *Database and
+schema* with nothing below it, and the external node's own panel carries three
+fields only — `Source: Amazon S3`, `Type: External Node`,
+`Namespace: s3://cordata-lake`.
+
+### The complete inventory of what an external edge retains
+
+| sent in the event | kept? | where it shows |
+|---|---|---|
+| `inputs[].namespace` / `name` | **yes** | node + edge *From* |
+| `outputs[].namespace` / `name` | **yes** | edge *To* |
+| `outputs[].facets.columnLineage` | **yes** | columns on both nodes, mapping preserved |
+| `run.runId` | **yes** | edge *Run ID* |
+| `eventTime` | **yes** | edge *Run on* |
+| `job.name`, `job.namespace` | **no** | — |
+| `job.facets.processing` (`purpose`, `legal_basis`) | **no** | — |
+| `job.facets.sourceCodeLocation` | **no** | — |
+| `run.facets.nominalTime` | **no** | — |
+| `producer` | **no** | — |
+| `outputs[].facets.schema` | not distinguishable from the table's own columns | — |
+
+**Addressing is kept. Meaning is discarded.** Where from, where to, which
+columns, which run, when — all retained. Why the processing happened, under
+what legal basis, from which commit, and even what the job was called — none
+of it.
+
 That is a coherent design for a lineage viewer and useless as an Art. 30
 input. Part 2 § 1 puts `purpose` and `legal_basis` on every event precisely so
 the RoPA can be projected from them; those fields go in and cannot be got
