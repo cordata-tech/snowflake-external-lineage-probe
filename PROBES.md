@@ -141,8 +141,33 @@ If that holds after latency is excluded it is a finding in its own right, and
 it bears directly on the post's thesis: a sink you cannot verify wrote
 anything is not an evidence store.
 
-**Do not write this up until a re-check hours later still shows 0 rows, and
-until the Snowsight lineage UI has been checked as an independent read path.**
+### The control that isolates it
+
+Ran a native Snowflake lineage edge through the *same* read path at the *same*
+moment, to separate "read path or latency" from "external ingest did not land":
+
+```sql
+CREATE OR REPLACE TABLE LINEAGE_TEST.PUBLIC.SCORED_COPY AS
+  SELECT tx_id, fraud_score FROM LINEAGE_TEST.PUBLIC.TRANSACTIONS_SCORED;
+```
+
+| query | result |
+|---|---|
+| native edge, ~10 seconds after the CTAS | **1 row** — `TRANSACTIONS_SCORED -> SCORED_COPY`, distance 1 |
+| external edge, ~25 minutes after ingest | **0 rows** |
+
+That rules out three explanations at once: the read path works, `GET_LINEAGE`
+is not generally lagged, and the query shape is right — an identical query
+returns rows for the native edge.
+
+What remains is either an external-ingest visibility lag far longer than
+native, or events accepted and dropped. **Both support the post's thesis.** If
+it is a lag, a 200 tells a producer nothing about whether or when its lineage
+lands; if it is a drop, the sink discards silently. Either way the sink cannot
+be verified from outside, which is the property an evidence store needs.
+
+**Still to do before publishing this:** a re-check hours later, and the
+Snowsight lineage UI as an independent read path.
 The Topcoat pilot recorded a false finding this way once — a stale build that
 looked like a framework bug — and the rule since is that an environmental
 explanation gets excluded before a vendor one gets published.
