@@ -99,89 +99,70 @@ Note this is not a bug. A *lineage graph* records which datasets derive from
 which, and a run that failed produced nothing to record. The error is treating
 the graph as a run log or an evidence store.
 
-## P1 — facet survival: **BLOCKED, and the blocker may be the finding**
+## P1 — CORRECTED. The edge landed. It is visible, and it is not queryable.
 
-Sent a full `COMPLETE` event: S3 input, the Snowflake table
-`LINEAGE_TEST.PUBLIC.TRANSACTIONS_SCORED` as output, carrying a custom
-`job.facets.processing` (`purpose`, `legal_basis`), `sourceCodeLocation`,
-`schema` and `columnLineage`. **HTTP 200, empty body.**
+**My first hypothesis was wrong and is recorded here rather than quietly
+dropped.** I concluded from `GET_LINEAGE` returning 0 rows that the events had
+been accepted and discarded. The Snowsight lineage graph shows otherwise:
 
-`GET_LINEAGE` on the table returns **0 rows**, checked repeatedly over roughly
-twenty minutes. So the facet question cannot be answered yet — no edge exists
-to read facets from.
-
-**What was ruled out**
-
-- Namespace spelling. `CURRENT_ORGANIZATION_NAME()`/`CURRENT_ACCOUNT_NAME()`
-  confirm `MYORG`/`MYACCT`, matching the documented
-  `snowflake://ORG-ACCOUNT` form.
-- My own query being wrong on the Snowflake side — the table anchor is a plain
-  `'TABLE'` domain query and compiles fine, returning the documented columns.
-
-**What is NOT yet ruled out**
-
-- Ingestion latency. Nothing in the documentation states a visibility SLA.
-- Whether the read path for external-sourced edges needs something else again.
-
-**The observation worth keeping either way.** Five namespace variants were
-sent, including `MYORG-MYACCT` with **no scheme at all**, which is not a
-valid OpenLineage namespace by any reading:
-
-| namespace sent | HTTP |
-|---|---|
-| `snowflake://MYORG-MYACCT` | 200 |
-| `snowflake://myorg-myacct` | 200 |
-| `snowflake://AB12345` (locator) | 200 |
-| `snowflake://myorg-myacct.snowflakecomputing.com` | 200 |
-| `MYORG-MYACCT` (malformed) | 200 |
-
-All five accepted, all with an empty body. **A producer gets no signal
-distinguishing an event that linked from one that was accepted and dropped.**
-If that holds after latency is excluded it is a finding in its own right, and
-it bears directly on the post's thesis: a sink you cannot verify wrote
-anything is not an evidence store.
-
-### The control that isolates it
-
-Ran a native Snowflake lineage edge through the *same* read path at the *same*
-moment, to separate "read path or latency" from "external ingest did not land":
-
-```sql
-CREATE OR REPLACE TABLE LINEAGE_TEST.PUBLIC.SCORED_COPY AS
-  SELECT tx_id, fraud_score FROM LINEAGE_TEST.PUBLIC.TRANSACTIONS_SCORED;
 ```
+Amazon S3                    LINEAGE_TEST.PUBLIC          LINEAGE_TEST.PUBLIC
+fraud_raw/transactions  -->  TRANSACTIONS_SCORED     -->  SCORED_COPY
+                             TX_ID, FRAUD_SCORE
+```
+
+The external edge ingested correctly, first time, with the namespace
+`snowflake://MYORG-MYACCT`. Nothing was dropped.
+
+### The actual finding: the two read paths disagree
+
+Same table, same function, same moment:
 
 | query | result |
 |---|---|
-| native edge, ~10 seconds after the CTAS | **1 row** — `TRANSACTIONS_SCORED -> SCORED_COPY`, distance 1 |
-| external edge, ~25 minutes after ingest | **0 rows** |
+| `GET_LINEAGE(..., 'DOWNSTREAM', 3)` — native edge | **1 row** |
+| `GET_LINEAGE(..., 'UPSTREAM', 3)` — external edge, **visible in the UI** | **0 rows** |
+| `GET_LINEAGE('SCORED_COPY', ..., 'UPSTREAM', 5)` | stops at `TRANSACTIONS_SCORED`, never reaches S3 |
 
-That rules out three explanations at once: the read path works, `GET_LINEAGE`
-is not generally lagged, and the query shape is right — an identical query
-returns rows for the native edge.
+And there is no argument that turns it on. The deployed signature is
+`GET_LINEAGE(object_name, object_domain, direction, max_distance,
+object_version)` — confirmed by `SHOW FUNCTIONS` and by probing named
+arguments until one was accepted. There is **no namespace parameter and no
+include-external flag**, `'EXTERNAL'` returns *"Unknown domain"*, and
+`SNOWFLAKE.ACCOUNT_USAGE` contains **no lineage view of any kind**.
 
-What remains is either an external-ingest visibility lag far longer than
-native, or events accepted and dropped. **Both support the post's thesis.** If
-it is a lag, a 200 tells a producer nothing about whether or when its lineage
-lands; if it is a drop, the sink discards silently. Either way the sink cannot
-be verified from outside, which is the property an evidence store needs.
+So the external half of the lineage graph can be **looked at and not queried**.
 
-**Still to do before publishing this:** a re-check hours later, and the
-Snowsight lineage UI as an independent read path.
-The Topcoat pilot recorded a false finding this way once — a stale build that
-looked like a framework bug — and the rule since is that an environmental
-explanation gets excluded before a vendor one gets published.
+### Why this is the post
 
-### My own errors while probing, for the record
+Cordata's whole argument is that metadata earns its place by being
+*queryable evidence* — something you can diff, review, project into an Art. 30
+record, and fail a build on. A graph that renders in a console but cannot be
+reached from SQL is a picture. You cannot generate a report from it, cannot
+diff it between environments, cannot assert on it in CI, and cannot build a
+control plane on top of it.
 
-- `SYSTEM$GET_LINEAGE` does not exist; it is `SNOWFLAKE.CORE.GET_LINEAGE`, a
-  table function.
-- The published docs describe a `namespace =>` named argument for querying
-  external objects with `object_domain => 'EXTERNAL'`. **Neither exists in the
-  deployed function.** `SHOW FUNCTIONS` gives the real signature —
-  `GET_LINEAGE(VARCHAR, VARCHAR, VARCHAR, DEFAULT NUMBER, DEFAULT VARCHAR)` —
-  and `'EXTERNAL'` returns *"Unknown domain: EXTERNAL."* Introspecting the
-  account beat reading the documentation, which is worth a line in the post.
+Combined with P2 — only `COMPLETE` accepted — the shape of what Snowflake
+shipped is clear and defensible **for what it is**: a visualisation of where
+data came from, for a human looking at a table in a console. That is a real
+and useful thing. It is not an evidence store, and the mistake would be
+treating "we emit OpenLineage to Snowflake" as discharging an obligation that
+needs machine-readable, queryable provenance.
+
+### Note on the documentation
+
+The published docs describe a `namespace =>` named argument and an
+`object_domain => 'EXTERNAL'` for querying external objects. **Neither exists
+in the deployed function.** `SHOW FUNCTIONS` was the reliable source and the
+documentation was not.
+
+### Still open on P1
+
+Whether the custom `job.facets.processing` fields (`purpose`, `legal_basis`)
+survived is **still unanswered**, and now for a different reason: there is no
+SQL path to the external edge, so there is nowhere to read facets from. Next
+step is to check whether the Snowsight UI surfaces any facet detail when the
+external node or the edge is selected.
 
 ## Still to run
 - **P3** — is an unmodified `cordata-tech/pipeline-runtime` event accepted?
