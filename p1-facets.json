@@ -1,0 +1,64 @@
+{
+  "eventType": "COMPLETE",
+  "eventTime": "2026-09-06T09:15:00.000Z",
+  "producer": "https://github.com/cordata-tech/pipeline-runtime/tree/2.4.1",
+  "schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent",
+  "run": {
+    "runId": "33333333-3333-4333-8333-333333333333",
+    "facets": {
+      "nominalTime": {
+        "_producer": "https://github.com/cordata-tech/pipeline-runtime",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/NominalTimeRunFacet.json",
+        "nominalStartTime": "2026-09-06T09:00:00Z"
+      }
+    }
+  },
+  "job": {
+    "namespace": "cordata.fraud",
+    "name": "transactions-scored-daily",
+    "facets": {
+      "processing": {
+        "_producer": "https://github.com/cordata-tech/pipeline-runtime",
+        "_schemaURL": "https://cordata.tech/spec/processing-facet/1-0-0.json",
+        "purpose": "fraud-detection",
+        "legal_basis": "legitimate-interest"
+      },
+      "sourceCodeLocation": {
+        "_producer": "https://github.com/cordata-tech/pipeline-runtime",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/SourceCodeLocationJobFacet.json",
+        "type": "git",
+        "url": "https://github.com/cordata-tech/domains-fraud",
+        "path": "sql/score.sql"
+      }
+    }
+  },
+  "inputs": [
+    {"namespace": "s3://cordata-lake", "name": "fraud_raw/transactions"}
+  ],
+  "outputs": [
+    {
+      "namespace": "snowflake://MYORG-MYACCT",
+      "name": "LINEAGE_TEST.PUBLIC.TRANSACTIONS_SCORED",
+      "facets": {
+        "schema": {
+          "_producer": "https://github.com/cordata-tech/pipeline-runtime",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/SchemaDatasetFacet.json",
+          "fields": [
+            {"name": "TX_ID", "type": "STRING"},
+            {"name": "FRAUD_SCORE", "type": "DOUBLE"}
+          ]
+        },
+        "columnLineage": {
+          "_producer": "https://github.com/cordata-tech/pipeline-runtime",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/ColumnLineageDatasetFacet.json",
+          "fields": {
+            "TX_ID": {"inputFields": [
+              {"namespace": "s3://cordata-lake", "name": "fraud_raw/transactions", "field": "tx_id"}]},
+            "FRAUD_SCORE": {"inputFields": [
+              {"namespace": "s3://cordata-lake", "name": "fraud_raw/transactions", "field": "amount"}]}
+          }
+        }
+      }
+    }
+  ]
+}

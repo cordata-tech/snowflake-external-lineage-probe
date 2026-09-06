@@ -1,0 +1,8 @@
+# Key material — never commit. Regenerate with the commands in README.md.
+rsa_key.p8
+rsa_key.pub
+
+# Scratch
+/tmp/
+*.out
+.env.local
