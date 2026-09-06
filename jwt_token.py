@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mint a Snowflake key-pair JWT. stdlib + openssl only, nothing to install.
+"""Sign a Snowflake key-pair JWT. stdlib + openssl only, nothing to install.
 
 Snowflake wants iss = <ACCOUNT_LOCATOR>.<USER>.SHA256:<public key fingerprint>
 and sub = <ACCOUNT_LOCATOR>.<USER>, both uppercased, signed RS256.

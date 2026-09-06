@@ -63,7 +63,7 @@ account and asking to be believed.
 **Yes, HTTP 200.** A valid `COMPLETE` event with both sides external was
 accepted. Auth is key-pair JWT (`X-Snowflake-Authorization-Token-Type:
 KEYPAIR_JWT`); username/password is not accepted. The JWT is signed RS256 with
-`iss = <LOCATOR>.<USER>.SHA256:<fp>` and `sub = <LOCATOR>.<USER>`. Minted with
+`iss = <LOCATOR>.<USER>.SHA256:<fp>` and `sub = <LOCATOR>.<USER>`. Signed with
 stdlib plus `openssl` — see `jwt_token.py`; no SDK required.
 
 Response body on success is **empty**. Not an ack, not an id, not a count.

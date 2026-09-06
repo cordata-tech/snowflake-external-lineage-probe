@@ -38,7 +38,7 @@ GRANT DELETE LINEAGE ON ACCOUNT TO ROLE <role>;
 # 3. point the scripts at your account
 cp .env.local.example .env.local && $EDITOR .env.local && source .env.local
 
-python3 jwt_token.py      # mints a key-pair JWT, stdlib + openssl, no SDK
+python3 jwt_token.py      # signs a key-pair JWT, stdlib + openssl, no SDK
 ./sql.sh "SELECT CURRENT_VERSION()"
 ```
 
@@ -47,7 +47,7 @@ python3 jwt_token.py      # mints a key-pair JWT, stdlib + openssl, no SDK
 | | |
 |---|---|
 | `PROBES.md` | the findings, with raw requests and responses |
-| `jwt_token.py` | key-pair JWT minting — RS256 via `openssl`, no dependencies |
+| `jwt_token.py` | signs a key-pair JWT — RS256 via `openssl`, no dependencies |
 | `sql.sh` | run a statement through the SQL API with the same JWT |
 | `p*.json` | the event payloads sent to `/api/v2/lineage/external-lineage` |
 
